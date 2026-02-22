@@ -16,15 +16,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weatherappi.viewmodel.WeatherViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun WeatherScreen(
     modifier: Modifier = Modifier,
-    weatherViewModel: WeatherViewModel = viewModel()
+    factory: ViewModelProvider.Factory
 ) {
+    val weatherViewModel: WeatherViewModel = viewModel(factory = factory)
+
     val uiState by weatherViewModel.uiState.collectAsState()
+    val cached = weatherViewModel.cachedWeather.collectAsState().value
 
     Column(
         modifier = modifier
@@ -54,18 +62,30 @@ fun WeatherScreen(
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(8.dp))
             Text("Loading...")
-        } else {
-            uiState.error?.let {
-                Text(it)
-            }
+        }
 
-            if (uiState.temperatureText != null && uiState.description != null) {
-                Text("Temperature: ${uiState.temperatureText}")
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Description: ${uiState.description}")
-            } else if (uiState.error == null) {
-                Text("Enter a city and press Hae sää.")
-            }
+        uiState.error?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(it)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (cached != null) {
+            val tempText = "${cached.temperature.roundToInt()} °C"
+            Text("Temperature: $tempText")
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("Description: ${cached.description}")
+
+            // --- Proof of Room + cache: show timestamp and age ---
+            val minutesAgo = ((System.currentTimeMillis() - cached.fetchedAtMillis) / 60000L).toInt()
+            val timeText = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                .format(Date(cached.fetchedAtMillis))
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Room cache: $timeText ($minutesAgo min ago)")
+        } else if (!uiState.isLoading && uiState.error == null) {
+            Text("No cached weather yet. Enter a city and press Hae sää.")
         }
     }
 }

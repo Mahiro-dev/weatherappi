@@ -2,76 +2,58 @@ package com.example.weatherappi.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weatherappi.BuildConfig
-import com.example.weatherappi.data.remote.RetrofitInstance
+import com.example.weatherappi.data.model.WeatherEntity
+import com.example.weatherappi.data.repository.WeatherRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
-import java.io.IOException
-import kotlin.math.roundToInt
 
 data class WeatherUiState(
     val city: String = "",
     val isLoading: Boolean = false,
-    val temperatureText: String? = null,
-    val description: String? = null,
     val error: String? = null
 )
 
-class WeatherViewModel : ViewModel() {
+class WeatherViewModel(
+    private val repository: WeatherRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WeatherUiState())
     val uiState: StateFlow<WeatherUiState> = _uiState.asStateFlow()
 
+    private val cityFlow = MutableStateFlow("")
+
+    val cachedWeather: StateFlow<WeatherEntity?> = cityFlow
+        .flatMapLatest { city -> repository.observeCity(city.trim()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     fun updateCity(newCity: String) {
-        _uiState.update { it.copy(city = newCity) }
+        _uiState.update { it.copy(city = newCity, error = null) }
     }
 
     fun fetchWeather() {
         val city = _uiState.value.city.trim()
-
         if (city.isEmpty()) {
             _uiState.update { it.copy(error = "Please enter a city name.") }
             return
         }
 
+        // Start observing this city in Room
+        cityFlow.value = city
+
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isLoading = true,
-                    error = null,
-                    temperatureText = null,
-                    description = null
-                )
-            }
-
+            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val result = RetrofitInstance.api.getWeatherByCity(
-                    city = city,
-                    apiKey = BuildConfig.OPENWEATHER_API_KEY
-                )
-
-                val tempRounded = result.main.temp.roundToInt()
-                val desc = result.weather.firstOrNull()?.description ?: "No description"
-
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        temperatureText = "$tempRounded °C",
-                        description = desc,
-                        error = null
-                    )
-                }
-            } catch (_: IOException) {
-                _uiState.update { it.copy(isLoading = false, error = "Network error. Check your internet.") }
-            } catch (e: HttpException) {
-                val msg = if (e.code() == 404) "City not found." else "Server error (${e.code()})."
-                _uiState.update { it.copy(isLoading = false, error = msg) }
+                repository.refreshIfStale(city)
             } catch (_: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "Something went wrong.") }
+                _uiState.update { it.copy(error = "Failed to fetch weather.") }
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }

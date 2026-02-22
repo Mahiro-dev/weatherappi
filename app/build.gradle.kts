@@ -2,7 +2,9 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 // Load local.properties to safely read the API key
@@ -14,20 +16,23 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.weatherappi"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.weatherappi"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Set the OpenWeather API Key from local.properties
-        val apiKey = localProperties.getProperty("OPENWEATHER_API_KEY") ?: ""
-        buildConfigField("String", "OPENWEATHER_API_KEY", "\"$apiKey\"")
+        var apiKey = localProperties.getProperty("OPENWEATHER_API_KEY") ?: ""
+        if (!apiKey.startsWith("\"")) {
+            apiKey = "\"$apiKey\""
+        }
+        buildConfigField("String", "OPENWEATHER_API_KEY", apiKey)
     }
 
     buildTypes {
@@ -42,6 +47,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
     }
     buildFeatures {
         compose = true
@@ -59,6 +67,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // Networking & Coroutines
     implementation(libs.retrofit)
