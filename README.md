@@ -1,69 +1,59 @@
-## Week 5 – Weather App (Retrofit + OpenWeather)
+## Week 6 – Weather App with Room
+What Room does?
+- Room provides a local SQLite database with structured layers:
+- Entity defines the table structure.
+- DAO contains database queries.
+- RoomDatabase creates and provides the database instance.
+- Repository combines API and database logic.
+- ViewModel manages UI state and calls the repository.
+Compose UI observes state and updates automatically.
 
-This application fetches weather data from the OpenWeather API and displays it using Jetpack Compose.
+Project Structure
 
-## What Retrofit does
+inside  data, folders model, remote, local, repository
 
-Retrofit handles HTTP requests to the OpenWeather API.
+data/
 
-- It sends the request to the weather endpoint.
+  model/
+  
+  remote/
+  
+  local/
+  
+  repository/
+  
 
-- It receives the JSON response from the server.
 
-- It converts the response into Kotlin data classes using a converter.
+viewmodel/
 
-## How JSON is converted to data classes
+ui/
 
-Gson is used as the converter.
+- Remote handles Retrofit API calls.
+- Local handles Room database.
+- Repository connects API and Room.
+- ViewModel exposes StateFlow.
+- UI reacts to state changes.
 
-- The OpenWeather API returns JSON.
+## Data Flow
 
-- Gson automatically maps the JSON fields into Kotlin data classes.
+1. User enters a city.
+2. ViewModel calls Repository.
+3. Repository checks Room cache.
+4. If needed, API is called via Retrofit.
+5. Result is saved to Room.
+6. ViewModel updates UI state.
+7. Compose recomposes automatically.
 
-- The data classes match the structure of the API response.
+Flow direction:
+UI -> ViewModel -> Repository -> (Room / API) -> ViewModel -> UI
 
-This conversion happens automatically inside Retrofit through the GsonConverterFactory.
+## Cache Logic
 
-## How coroutines work in this project
-
-- The API function in the Retrofit interface is defined as a suspend function.
-
-- The request is executed inside viewModelScope.launch in the ViewModel.
-
-- The network call runs in the background.
-
-- When the data is received, the UI updates automatically.
-
-## How UI state works
-
-ViewModel manages a WeatherUiState data class.
-UI state contains city, loading state, weather data, and possible errors.
-
-ViewModel updates the state when:
-
-- the user changes the city
-
-- a request starts
-
-- data is received
-
-- an error occurs
-
-- Jetpack Compose observes the state using collectAsState.
-
-- When the state changes, Compose recomposes automatically.
-
-## How the API key is stored
-
-The API key is not hardcoded in the source code.
-
-- It is stored in local.properties.
-
-- It is exposed to the app using buildConfigField.
-
-- It is accessed through BuildConfig.OPENWEATHER_API_KEY.
-
-- The key is passed to Retrofit when making the API request.
+Each weather entry stores a timestamp.
+When fetching data
+- If cached data is less than 30 minutes old -> use Room.
+- If older than 30 minutes -> fetch from API and update Room.
+This reduces unnecessary network requests and allows basic offline usage
 
 ## APK 
 its provided in the release
